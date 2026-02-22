@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../utils/local_db.dart';
 
 class AutoSuggestField extends StatelessWidget {
@@ -6,6 +7,7 @@ class AutoSuggestField extends StatelessWidget {
   final String label;
   final String dbKey;
   final int maxLines;
+  final VoidCallback? onChanged;
 
   const AutoSuggestField({
     super.key,
@@ -13,6 +15,7 @@ class AutoSuggestField extends StatelessWidget {
     required this.label,
     required this.dbKey,
     this.maxLines = 1,
+    this.onChanged,
   });
 
   @override
@@ -26,23 +29,24 @@ class AutoSuggestField extends StatelessWidget {
               if (textEditingValue.text.isEmpty) {
                 return const Iterable<String>.empty();
               }
-              // Fetch suggestions and filter based on what the doctor is typing
               return LocalDb.getSuggestions(dbKey).where((option) {
                 return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
               });
             },
             onSelected: (String selection) {
-              // Do nothing on select, the controller updates automatically
+              if (onChanged != null) onChanged!();
             },
             fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
               return TextField(
                 controller: textController,
                 focusNode: focusNode,
                 maxLines: maxLines,
+                onChanged: (_) {
+                  if (onChanged != null) onChanged!();
+                },
                 decoration: InputDecoration(
                   labelText: label,
-                  border: const OutlineInputBorder(),
-                  isDense: true,
+                  labelStyle: TextStyle(color: Colors.grey.shade600),
                 ),
                 onSubmitted: (String value) => onFieldSubmitted(),
               );
@@ -51,29 +55,33 @@ class AutoSuggestField extends StatelessWidget {
               return Align(
                 alignment: Alignment.topLeft,
                 child: Material(
-                  elevation: 4.0,
-                  borderRadius: BorderRadius.circular(4),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: 200,
-                      maxWidth: constraints.maxWidth, // Match width of text field
+                  color: Colors.transparent,
+                  child: Container(
+                    width: constraints.maxWidth,
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))
+                      ],
                     ),
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       shrinkWrap: true,
                       itemCount: options.length,
+                      separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade100),
                       itemBuilder: (BuildContext context, int index) {
                         final String option = options.elementAt(index);
-                        return InkWell(
+                        return ListTile(
+                          title: Text(option, style: const TextStyle(fontWeight: FontWeight.w500)),
+                          trailing: const Icon(Icons.arrow_upward, size: 16, color: Colors.grey),
                           onTap: () => onSelected(option),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Text(option, style: const TextStyle(fontSize: 14)),
-                          ),
+                          hoverColor: Colors.blue.shade50,
                         );
                       },
                     ),
-                  ),
+                  ).animate().fadeIn(duration: 200.ms).slideY(begin: -0.05, end: 0),
                 ),
               );
             },

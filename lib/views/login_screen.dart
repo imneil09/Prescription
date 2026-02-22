@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'prescription_screen.dart';
 
 class PinLoginScreen extends StatefulWidget {
@@ -12,61 +13,91 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
   final TextEditingController _pinController = TextEditingController();
   final String _correctPin = "1234";
   String _errorMessage = "";
+  bool _isLoading = false;
 
-  void _login() {
+  void _login() async {
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(milliseconds: 600)); // Fake secure processing
     if (_pinController.text == _correctPin) {
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const PrescriptionScreen()),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const PrescriptionScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       );
     } else {
-      setState(() => _errorMessage = "Invalid PIN.");
+      setState(() {
+        _errorMessage = "Invalid Access PIN";
+        _isLoading = false;
+        _pinController.clear();
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueGrey[50],
+      backgroundColor: const Color(0xFF0F172A),
       body: Center(
         child: Container(
-          width: 350,
-          padding: const EdgeInsets.all(32.0),
+          width: 400,
+          padding: const EdgeInsets.all(48.0),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, spreadRadius: 5)],
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.2), blurRadius: 60, spreadRadius: 10),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.medical_services, size: 60, color: Color(0xFF1E3A8A)),
-              const SizedBox(height: 16),
-              const Text("Doctor Login", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 32),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
+                child: Icon(Icons.health_and_safety, size: 64, color: Theme.of(context).colorScheme.primary),
+              ).animate().scale(delay: 200.ms, duration: 400.ms, curve: Curves.easeOutBack),
+              const SizedBox(height: 24),
+              const Text("Dr. Rx Portal", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)).animate().fadeIn(delay: 300.ms),
+              Text("Secure Offline Workspace", style: TextStyle(color: Colors.grey.shade600)).animate().fadeIn(delay: 400.ms),
+              const SizedBox(height: 40),
               TextField(
                 controller: _pinController,
                 obscureText: true,
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8),
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Enter 4-Digit PIN'),
-                onSubmitted: (_) => _login(),
-              ),
-              if (_errorMessage.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(_errorMessage, style: const TextStyle(color: Colors.red)),
-              ],
-              const SizedBox(height: 24),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: const Color(0xFF1E3A8A),
-                  foregroundColor: Colors.white,
+                style: const TextStyle(fontSize: 32, letterSpacing: 16, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: '••••',
+                  hintStyle: TextStyle(color: Colors.grey.shade300, letterSpacing: 16),
                 ),
-                onPressed: _login,
-                child: const Text("ACCESS SECURE PORTAL"),
-              )
+                onSubmitted: (_) => _login(),
+              ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2, end: 0),
+              if (_errorMessage.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(_errorMessage, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600)).animate().shake(),
+              ],
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  onPressed: _isLoading ? null : _login,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("AUTHENTICATE", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                ),
+              ).animate().fadeIn(delay: 600.ms),
             ],
           ),
         ),
