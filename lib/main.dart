@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'utils/local_db.dart';
 import 'views/login_screen.dart';
 
@@ -25,7 +24,7 @@ class DoctorPrescriptionApp extends StatelessWidget {
           surface: const Color(0xFFF8FAFC),
         ),
         useMaterial3: true,
-        textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme),
+        // Removed google_fonts here to use standard offline system fonts
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,

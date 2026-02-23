@@ -64,8 +64,8 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                     child: Icon(Icons.health_and_safety, size: 64, color: Theme.of(context).colorScheme.primary),
                   ).animate().scale(delay: 200.ms, duration: 400.ms, curve: Curves.easeOutBack),
                   const SizedBox(height: 24),
-                  const Text("Dr. Rx Portal", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)).animate().fadeIn(delay: 300.ms),
-                  Text("Secure Offline Workspace", style: TextStyle(color: Colors.grey.shade600)).animate().fadeIn(delay: 400.ms),
+                  const Text("DR. SANKAR DEBROY", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -0.5)).animate().fadeIn(delay: 300.ms),
+                  Text("Secure Workspace", style: TextStyle(color: Colors.grey.shade600)).animate().fadeIn(delay: 400.ms),
                   const SizedBox(height: 40),
                   TextField(
                     controller: _pinController,
@@ -97,7 +97,7 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                       onPressed: _isLoading ? null : _login,
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text("AUTHENTICATE", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                          : const Text("ACCESS", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                     ),
                   ).animate().fadeIn(delay: 600.ms),
                 ],
@@ -111,7 +111,7 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
             right: 0,
             child: Center(
               child: const Text(
-                "Designed & Developed by Rashi – Proudly Made in India",
+                "Designed & Developed @Rashi Lab – Proudly Made in India",
                 style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 0.5),
               ).animate().fadeIn(delay: 800.ms),
             ),

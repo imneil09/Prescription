@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:path_provider/path_provider.dart';
 import '../utils/pdf_generator.dart';
 import '../utils/local_db.dart';
 import '../widgets/auto_suggest_field.dart';
@@ -16,6 +20,7 @@ class PrescriptionScreen extends StatefulWidget {
 }
 
 class _PrescriptionScreenState extends State<PrescriptionScreen> {
+  // Basic Info
   final _nameCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
   final _bpCtrl = TextEditingController();
@@ -27,31 +32,58 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   String _selectedGender = 'Male';
   final List<String> _genderOptions = ['Male', 'Female', 'Other'];
 
+  // Past History
   List<String> _selectedPastHistory = [];
-  final List<String> _pastHistoryOptions = ['APD', 'HTN', 'Asthma', 'DM2', 'Hypothyroid', 'Drug Allergy', 'Fever', 'Cough', 'Respiratory Distress', 'None'];
+  final List<String> _pastHistoryOptions = [
+    'APD', 'HTN', 'Asthma', 'DM2', 'Hypothyroid', 'Drug Allergy',
+    'Fever', 'Cough', 'Respiratory Distress', 'None', 'Other'
+  ];
+  final _customPastHistoryCtrl = TextEditingController();
 
+  // Diet
   String? _selectedDiet;
-  final List<String> _dietOptions = ['High Protein Diet', 'Low Salt Diet', 'Diabetic Diet', 'Soft Diet', 'Liquid Diet', 'Normal Diet'];
+  final List<String> _dietOptions = [
+    'High Protein Diet', 'Low Salt Diet', 'Diabetic Diet',
+    'Soft Diet', 'Liquid Diet', 'Normal Diet', 'Other'
+  ];
+  final _customDietCtrl = TextEditingController();
 
+  // Investigations
   String? _selectedInvestigation;
-  final List<String> _investigationOptions = ['CBC', 'ESR', 'CRP', 'X-ray', 'MRI', 'CT Scan', 'LFT', 'KFT', 'Blood Sugar (Fasting)', 'Blood Sugar (PP)', 'HbA1c'];
+  final List<String> _investigationOptions = [
+    'CBC', 'ESR', 'CRP', 'LFT', 'KFT', 'RFT', 'Lipid Profile', 'Thyroid Profile', 'HbA1c',
+    'Blood Sugar (Fasting)', 'Blood Sugar (PP)', 'Urine Routine', 'Urine Culture',
+    'X-ray', 'MRI', 'CT Scan', 'Ultrasound', 'ECG', 'ECHO', 'TMT', 'Vitamin D',
+    'Vitamin B12', 'Dengue Test', 'Malaria Test', 'Typhoid Test', 'Sputum AFB', 'Mantoux Test', 'Other'
+  ];
   List<String> _selectedInvestigations = [];
+  final _customInvestigationCtrl = TextEditingController();
 
   // Medicine Table States
   final _medNameCtrl = TextEditingController();
-  final _medDoseCtrl = TextEditingController(); // Frequency (e.g. 1-0-1)
+
+  String _selectedFrequency = '100';
+  final List<String> _frequencyOptions = ['100', '010', '001', '110', '101', '011', '111', '200', 'SOS', 'Other'];
+  final _customFrequencyCtrl = TextEditingController();
+
+  String _selectedDoses = '1 Tablet';
+  final List<String> _dosesOptions = ['1 Tablet', '2 Tablets', '3 Tablets', '5 Tablets', '10 Tablets', '1 Bottle', '2 Bottles', '1 Strip', '2 Strips', 'Other'];
+  final _customDosesCtrl = TextEditingController();
 
   String _selectedTiming = 'After Food';
-  final List<String> _timingOptions = ['Before Food', 'After Food', 'Empty Stomach'];
+  final List<String> _timingOptions = ['Before Food', 'After Food', 'Empty Stomach', 'Other'];
+  final _customTimingCtrl = TextEditingController();
 
-  String _selectedQuantity = '1';
-  final List<String> _quantityOptions = ['1', '1/2', '2', '5 ml', '10 ml', '1 tsp', '2 tsp'];
-
+  // ADDED "Other" TO DURATION
   String _selectedDuration = '5 Days';
-  final List<String> _durationOptions = ['3 Days', '5 Days', '7 Days', '10 Days', '15 Days', '1 Month'];
+  final List<String> _durationOptions = ['3 Days', '5 Days', '7 Days', '10 Days', '15 Days', '1 Month', 'Other'];
+  final _customDurationCtrl = TextEditingController();
 
   List<Map<String, String>> medicines = [];
   List<Map<String, String>> emptyStomachMedicines = [];
+
+  // Next Visit
+  DateTime? _nextVisitDate;
 
   Timer? _debounce;
   bool _showPreview = false;
@@ -65,23 +97,41 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
 
   void _addMedicine() {
     if (_medNameCtrl.text.isNotEmpty) {
+      String finalFreq = _selectedFrequency == 'Other' ? _customFrequencyCtrl.text : _selectedFrequency;
+      String finalDoses = _selectedDoses == 'Other' ? _customDosesCtrl.text : _selectedDoses;
+      String finalTiming = _selectedTiming == 'Other' ? _customTimingCtrl.text : _selectedTiming;
+      String finalDuration = _selectedDuration == 'Other' ? _customDurationCtrl.text : _selectedDuration;
+
+      if (finalFreq.isEmpty) finalFreq = '-';
+      if (finalDoses.isEmpty) finalDoses = '-';
+      if (finalTiming.isEmpty) finalTiming = '-';
+      if (finalDuration.isEmpty) finalDuration = '-';
+
       setState(() {
         var newMed = {
           'name': _medNameCtrl.text,
-          'dose': _medDoseCtrl.text,
-          'quantity': _selectedQuantity,
-          'timing': _selectedTiming,
-          'duration': _selectedDuration,
+          'frequency': finalFreq,
+          'doses': finalDoses,
+          'timing': finalTiming,
+          'duration': finalDuration,
         };
 
-        if (_selectedTiming == 'Empty Stomach') {
+        if (finalTiming.toLowerCase() == 'empty stomach') {
           emptyStomachMedicines.add(newMed);
         } else {
           medicines.add(newMed);
         }
 
+        // Clear fields safely
         _medNameCtrl.clear();
-        _medDoseCtrl.clear();
+        _customFrequencyCtrl.clear();
+        _customDosesCtrl.clear();
+        _customTimingCtrl.clear();
+        _customDurationCtrl.clear();
+        if (_selectedFrequency == 'Other') _selectedFrequency = '100';
+        if (_selectedDoses == 'Other') _selectedDoses = '1 Tablet';
+        if (_selectedTiming == 'Other') _selectedTiming = 'After Food';
+        if (_selectedDuration == 'Other') _selectedDuration = '5 Days';
       });
       _onDataChanged();
     }
@@ -91,17 +141,17 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     LocalDb.saveSuggestion('patient_names', _nameCtrl.text);
     LocalDb.saveSuggestion('diagnoses', _diagnosisCtrl.text);
     LocalDb.saveSuggestion('advices', _adviceCtrl.text);
-    for (var med in medicines) {
-      LocalDb.saveSuggestion('medicines', med['name']!);
-      LocalDb.saveSuggestion('doses', med['dose']!);
-    }
-    for (var med in emptyStomachMedicines) {
-      LocalDb.saveSuggestion('medicines', med['name']!);
-      LocalDb.saveSuggestion('doses', med['dose']!);
-    }
+    for (var med in medicines) LocalDb.saveSuggestion('medicines', med['name']!);
+    for (var med in emptyStomachMedicines) LocalDb.saveSuggestion('medicines', med['name']!);
   }
 
   Map<String, dynamic> _getFormData() {
+    String finalPastHistory = _selectedPastHistory.contains('Other')
+        ? [..._selectedPastHistory.where((e) => e != 'Other'), _customPastHistoryCtrl.text].join(', ')
+        : _selectedPastHistory.join(', ');
+
+    String finalDiet = _selectedDiet == 'Other' ? _customDietCtrl.text : (_selectedDiet ?? '');
+
     return {
       'date': DateFormat('dd MMM yyyy').format(DateTime.now()),
       'patientName': _nameCtrl.text,
@@ -110,12 +160,13 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
       'bp': _bpCtrl.text,
       'weight': _weightCtrl.text,
       'diagnosis': _diagnosisCtrl.text,
-      'pastHistory': _selectedPastHistory.join(', '),
-      'diet': _selectedDiet ?? '',
+      'pastHistory': finalPastHistory,
+      'diet': finalDiet,
       'investigations': _selectedInvestigations.join(', '),
       'advice': _adviceCtrl.text,
       'medicines': medicines,
       'emptyStomachMedicines': emptyStomachMedicines,
+      'nextVisitDate': _nextVisitDate != null ? DateFormat('dd MMM yyyy').format(_nextVisitDate!) : '',
     };
   }
 
@@ -126,6 +177,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
       _adviceCtrl.clear(); _selectedPastHistory.clear();
       _selectedDiet = null; _selectedInvestigations.clear();
       medicines.clear(); emptyStomachMedicines.clear();
+      _customPastHistoryCtrl.clear(); _customDietCtrl.clear();
+      _customInvestigationCtrl.clear(); _customDurationCtrl.clear();
+      _nextVisitDate = null;
     });
     _onDataChanged();
   }
@@ -142,6 +196,44 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     );
   }
 
+  Future<void> _savePdfToFile(Uint8List pdfBytes, String patientName) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      String safeName = patientName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+      if (safeName.isEmpty) safeName = "Patient_Rx";
+
+      String basePath = '${directory.path}/$safeName';
+      File file = File('$basePath.pdf');
+
+      int counter = 1;
+      while (await file.exists()) {
+        file = File('${basePath}_$counter.pdf');
+        counter++;
+      }
+
+      await file.writeAsBytes(pdfBytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Saved to Documents: ${file.path.split(Platform.pathSeparator).last}'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF0F766E),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error saving file: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isWide = MediaQuery.of(context).size.width > 900;
@@ -151,9 +243,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // PATIENT PROFILE
+          // 1. PATIENT PROFILE CARD
           _buildCard(
-            title: 'Patient Profile',
+            title: 'Patient Details',
             icon: Icons.person_outline,
             child: Row(
               children: [
@@ -172,9 +264,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                 ),
               ],
             ),
-          ).animate().fadeIn().slideX(),
+          ).animate().fadeIn().slideY(begin: 0.05),
 
-          // CLINICAL FINDINGS & PAST HISTORY
+          // 2. CLINICAL FINDINGS CARD
           _buildCard(
               title: 'Clinical Findings & History',
               icon: Icons.monitor_heart_outlined,
@@ -190,17 +282,21 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                   ),
                   const SizedBox(height: 16),
                   AutoSuggestField(controller: _diagnosisCtrl, label: 'Primary Diagnosis / Symptoms', dbKey: 'diagnoses', maxLines: 2, onChanged: _onDataChanged),
-                  const SizedBox(height: 16),
-                  Text("Past History:", style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 24),
+                  Text("Past History / Co-morbidities", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blueGrey.shade700)),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8.0,
-                    runSpacing: 4.0,
+                    runSpacing: 8.0,
                     children: _pastHistoryOptions.map((option) {
+                      bool isSelected = _selectedPastHistory.contains(option);
                       return FilterChip(
-                        label: Text(option),
-                        selected: _selectedPastHistory.contains(option),
-                        selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                        label: Text(option, style: TextStyle(color: isSelected ? const Color(0xFF1E40AF) : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                        selected: isSelected,
+                        backgroundColor: const Color(0xFFF8FAFC),
+                        selectedColor: const Color(0xFFDBEAFE),
+                        checkmarkColor: const Color(0xFF1E40AF),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: isSelected ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0))),
                         onSelected: (bool selected) {
                           setState(() {
                             if (option == 'None' && selected) {
@@ -218,12 +314,15 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                         },
                       );
                     }).toList(),
-                  )
+                  ),
+                  if (_selectedPastHistory.contains('Other')) ...[
+                    const SizedBox(height: 12),
+                    TextField(controller: _customPastHistoryCtrl, onChanged: (_) => _onDataChanged(), decoration: const InputDecoration(labelText: 'Specify Other Disease', isDense: true)),
+                  ]
                 ],
-              )
-          ).animate().fadeIn(delay: 100.ms).slideX(),
+              )).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05),
 
-          // MEDICINES
+          // 3. MEDICINES CARD
           _buildCard(
               title: 'Rx Medications',
               icon: Icons.medication_outlined,
@@ -231,51 +330,89 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(flex: 3, child: AutoSuggestField(controller: _medNameCtrl, label: 'Medicine', dbKey: 'medicines')),
+                      Expanded(flex: 4, child: AutoSuggestField(controller: _medNameCtrl, label: 'Medicine Name', dbKey: 'medicines')),
                       const SizedBox(width: 12),
-                      Expanded(flex: 2, child: AutoSuggestField(controller: _medDoseCtrl, label: 'Freq (1-0-1)', dbKey: 'doses')),
+                      Expanded(flex: 2, child: DropdownButtonFormField<String>(value: _selectedFrequency, decoration: const InputDecoration(labelText: 'Frequency'), items: _frequencyOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) { setState(() => _selectedFrequency = v!); _onDataChanged(); })),
                       const SizedBox(width: 12),
-                      Expanded(flex: 2, child: DropdownButtonFormField<String>(value: _selectedQuantity, decoration: const InputDecoration(labelText: 'Qty'), items: _quantityOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => _selectedQuantity = v!))),
+                      Expanded(flex: 2, child: DropdownButtonFormField<String>(value: _selectedDoses, decoration: const InputDecoration(labelText: 'Doses'), items: _dosesOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) { setState(() => _selectedDoses = v!); _onDataChanged(); })),
                     ],
                   ),
+                  // Conditional Custom Inputs (Row 1)
+                  if (_selectedFrequency == 'Other' || _selectedDoses == 'Other') ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        if (_selectedFrequency == 'Other') Expanded(child: TextField(controller: _customFrequencyCtrl, decoration: const InputDecoration(labelText: 'Specify Frequency'))),
+                        if (_selectedFrequency == 'Other' && _selectedDoses == 'Other') const SizedBox(width: 12),
+                        if (_selectedDoses == 'Other') Expanded(child: TextField(controller: _customDosesCtrl, decoration: const InputDecoration(labelText: 'Specify Dose'))),
+                      ],
+                    )
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(flex: 3, child: DropdownButtonFormField<String>(value: _selectedTiming, decoration: const InputDecoration(labelText: 'Timing'), items: _timingOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => _selectedTiming = v!))),
+                      Expanded(flex: 3, child: DropdownButtonFormField<String>(value: _selectedTiming, decoration: const InputDecoration(labelText: 'Timing'), items: _timingOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) { setState(() => _selectedTiming = v!); _onDataChanged(); })),
                       const SizedBox(width: 12),
-                      Expanded(flex: 3, child: DropdownButtonFormField<String>(value: _selectedDuration, decoration: const InputDecoration(labelText: 'Duration'), items: _durationOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => _selectedDuration = v!))),
+                      Expanded(flex: 3, child: DropdownButtonFormField<String>(value: _selectedDuration, decoration: const InputDecoration(labelText: 'Duration'), items: _durationOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) { setState(() => _selectedDuration = v!); _onDataChanged(); })),
                       const SizedBox(width: 12),
                       InkWell(
                         onTap: _addMedicine,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(12)),
-                          child: const Text("ADD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                          decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1E40AF)]),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                          ),
+                          child: const Row(
+                              children: [
+                                Icon(Icons.add, color: Colors.white, size: 20),
+                                SizedBox(width: 8),
+                                Text("ADD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              ]
+                          ),
                         ),
                       )
                     ],
                   ),
-
-                  // EMPTY STOMACH TABLE
-                  if (emptyStomachMedicines.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Align(alignment: Alignment.centerLeft, child: Text("EMPTY STOMACH", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700, fontSize: 16))),
-                    const SizedBox(height: 8),
-                    ...emptyStomachMedicines.asMap().entries.map((entry) => _buildMedRow(entry.key, entry.value, true)).toList()
+                  // Conditional Custom Inputs (Row 2)
+                  if (_selectedTiming == 'Other' || _selectedDuration == 'Other') ...[
+                    const SizedBox(height: 12),
+                    Row(
+                        children: [
+                          if (_selectedTiming == 'Other') Expanded(child: TextField(controller: _customTimingCtrl, decoration: const InputDecoration(labelText: 'Specify Timing'))),
+                          if (_selectedTiming == 'Other' && _selectedDuration == 'Other') const SizedBox(width: 12),
+                          if (_selectedDuration == 'Other') Expanded(child: TextField(controller: _customDurationCtrl, decoration: const InputDecoration(labelText: 'Specify Duration'))),
+                        ]
+                    )
                   ],
 
-                  // REGULAR MEDICINES TABLE
+                  // Empty Stomach List
+                  if (emptyStomachMedicines.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(6)),
+                      child: const Text("EMPTY STOMACH MEDICINES", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626), fontSize: 12, letterSpacing: 1.0)),
+                    ),
+                    const SizedBox(height: 12),
+                    ...emptyStomachMedicines.asMap().entries.map((entry) => _buildMedRow(entry.key, entry.value, true)).toList()
+                  ],
+                  // Regular Med List
                   if (medicines.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Align(alignment: Alignment.centerLeft, child: Text("REGULAR MEDICINES", style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary, fontSize: 16))),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 32),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                      child: const Text("REGULAR MEDICINES", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 12, letterSpacing: 1.0)),
+                    ),
+                    const SizedBox(height: 12),
                     ...medicines.asMap().entries.map((entry) => _buildMedRow(entry.key, entry.value, false)).toList()
                   ]
                 ],
-              )
-          ).animate().fadeIn(delay: 200.ms).slideX(),
+              )).animate().fadeIn(delay: 200.ms).slideY(begin: 0.05),
 
-          // ADVICE, DIET & INVESTIGATIONS
+          // 4. RECOMMENDATIONS CARD
           _buildCard(
               title: 'Recommendations & Investigations',
               icon: Icons.lightbulb_outline,
@@ -299,36 +436,111 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                           decoration: const InputDecoration(labelText: 'Add Investigation'),
                           items: _investigationOptions.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
                           onChanged: (v) {
-                            if (v != null && !_selectedInvestigations.contains(v)) {
-                              setState(() => _selectedInvestigations.add(v));
-                              _onDataChanged();
+                            setState(() => _selectedInvestigation = v);
+                            if (v != null && v != 'Other' && !_selectedInvestigations.contains(v)) {
+                              _selectedInvestigations.add(v);
+                              _selectedInvestigation = null;
                             }
+                            _onDataChanged();
                           },
                         ),
                       ),
                     ],
                   ),
-                  if (_selectedInvestigations.isNotEmpty) ...[
+                  if (_selectedDiet == 'Other') ...[
                     const SizedBox(height: 12),
+                    TextField(controller: _customDietCtrl, onChanged: (_) => _onDataChanged(), decoration: const InputDecoration(labelText: 'Specify Diet Recommendation', isDense: true)),
+                  ],
+                  if (_selectedInvestigation == 'Other') ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _customInvestigationCtrl, decoration: const InputDecoration(labelText: 'Specify Investigation', isDense: true))),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E40AF), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            onPressed: () {
+                              if (_customInvestigationCtrl.text.isNotEmpty && !_selectedInvestigations.contains(_customInvestigationCtrl.text)) {
+                                setState(() {
+                                  _selectedInvestigations.add(_customInvestigationCtrl.text);
+                                  _customInvestigationCtrl.clear();
+                                  _selectedInvestigation = null;
+                                });
+                                _onDataChanged();
+                              }
+                            },
+                            child: const Padding(padding: EdgeInsets.symmetric(vertical: 14), child: Text('Add Investigation')))
+                      ],
+                    )
+                  ],
+                  if (_selectedInvestigations.isNotEmpty) ...[
+                    const SizedBox(height: 16),
                     Wrap(
-                      spacing: 8.0,
+                      spacing: 8.0, runSpacing: 8.0,
                       children: _selectedInvestigations.map((inv) => Chip(
-                          label: Text(inv),
+                          label: Text(inv, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF0F766E))),
+                          backgroundColor: const Color(0xFFCCFBF1),
+                          deleteIconColor: const Color(0xFF0F766E),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6), side: const BorderSide(color: Color(0xFF99F6E4))),
                           onDeleted: () { setState(() => _selectedInvestigations.remove(inv)); _onDataChanged(); }
                       )).toList(),
                     )
                   ],
-                  const SizedBox(height: 16),
-                  AutoSuggestField(controller: _adviceCtrl, label: 'Custom Advice / Notes', dbKey: 'advices', maxLines: 2, onChanged: _onDataChanged),
+                  const SizedBox(height: 24),
+                  AutoSuggestField(controller: _adviceCtrl, label: 'Custom Advice / Clinical Notes', dbKey: 'advices', maxLines: 3, onChanged: _onDataChanged),
                 ],
-              )
-          ).animate().fadeIn(delay: 300.ms).slideX(),
+              )).animate().fadeIn(delay: 300.ms).slideY(begin: 0.05),
+
+          // 5. NEXT VISIT CARD
+          _buildCard(
+              title: 'Next Visit & Follow-up',
+              icon: Icons.calendar_month_outlined,
+              child: Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 18),
+                    label: const Text("Select Date"),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        foregroundColor: const Color(0xFF0F172A),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFCBD5E1)))
+                    ),
+                    onPressed: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: _nextVisitDate ?? DateTime.now().add(const Duration(days: 7)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          builder: (context, child) => Theme(
+                            data: ThemeData.light().copyWith(colorScheme: const ColorScheme.light(primary: Color(0xFF1E40AF))),
+                            child: child!,
+                          )
+                      );
+                      if (pickedDate != null) {
+                        setState(() => _nextVisitDate = pickedDate);
+                        _onDataChanged();
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 16),
+                  if (_nextVisitDate != null)
+                    Chip(
+                      backgroundColor: const Color(0xFFFFFBEB), // Amber 50
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6), side: const BorderSide(color: Color(0xFFFDE68A))),
+                      label: Text('Next Visit: ${DateFormat('dd MMM yyyy').format(_nextVisitDate!)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
+                      onDeleted: () { setState(() => _nextVisitDate = null); _onDataChanged(); },
+                    )
+                ],
+              )).animate().fadeIn(delay: 400.ms).slideY(begin: 0.05),
         ],
       ),
     );
 
     Widget previewWidget = Container(
-      color: Colors.grey.shade200,
+      decoration: const BoxDecoration(
+          border: Border(left: BorderSide(color: Color(0xFFE2E8F0), width: 1))
+      ),
       child: PdfPreview(
         build: (format) => PdfGenerator.generatePdfBytes(_getFormData(), format),
         allowPrinting: true,
@@ -337,51 +549,78 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
         canChangePageFormat: false,
         canDebug: false,
         maxPageWidth: 700,
-        scrollViewDecoration: BoxDecoration(color: Colors.grey.shade200),
+        scrollViewDecoration: const BoxDecoration(color: Color(0xFFCBD5E1)), // Slate 300
       ),
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFFF8FAFC), // Ultra modern Slate 50 background
       appBar: AppBar(
-        title: const Text('Prescription Workspace', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Row(
+            children: [
+              Icon(Icons.health_and_safety, color: Color(0xFF1E40AF)),
+              SizedBox(width: 10),
+              Text('Rx Workspace', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.5)),
+            ]
+        ),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0,
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: const Color(0xFFE2E8F0), height: 1)),
         actions: [
           TextButton.icon(
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
-            label: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.logout, color: Color(0xFFEF4444)),
+            label: const Text("Logout", style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
             onPressed: _logout,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           if (isWide)
             TextButton.icon(
-              icon: Icon(_showPreview ? Icons.dock_rounded : Icons.picture_as_pdf, color: Theme.of(context).colorScheme.primary),
-              label: Text(_showPreview ? "Hide Preview" : "Show Preview", style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+              icon: Icon(_showPreview ? Icons.dock_rounded : Icons.picture_as_pdf, color: const Color(0xFF0F766E)),
+              label: Text(_showPreview ? "Hide Preview" : "Show Preview", style: const TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold)),
               onPressed: () { setState(() => _showPreview = !_showPreview); _onDataChanged(); },
             ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           TextButton.icon(
-            icon: const Icon(Icons.refresh, color: Colors.grey),
-            label: const Text("Clear", style: TextStyle(color: Colors.grey)),
+            icon: const Icon(Icons.refresh, color: Color(0xFF64748B)),
+            label: const Text("Clear", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
             onPressed: _clearForm,
           ),
           const SizedBox(width: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(vertical: 10.0),
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.save),
-              label: const Text('SAVE & PRINT'),
+              icon: const Icon(Icons.download, size: 18),
+              label: const Text('SAVE PDF', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF14B8A6),
-                foregroundColor: Colors.white,
-                elevation: 0,
+                  backgroundColor: const Color(0xFF1E40AF),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
               ),
               onPressed: () async {
                 _saveToDb();
+                final pdfBytes = await PdfGenerator.generatePdfBytes(_getFormData(), PdfPageFormat.a4);
+                await _savePdfToFile(pdfBytes, _nameCtrl.text);
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 10.0, bottom: 10.0, right: 20.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.print, size: 18),
+              label: const Text('PRINT', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+              ),
+              onPressed: () async {
+                _saveToDb();
+                final pdfBytes = await PdfGenerator.generatePdfBytes(_getFormData(), PdfPageFormat.a4);
                 await Printing.layoutPdf(
-                  onLayout: (format) => PdfGenerator.generatePdfBytes(_getFormData(), format),
+                  onLayout: (format) async => pdfBytes,
                   name: 'Rx_${_nameCtrl.text}',
                 );
               },
@@ -390,16 +629,20 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
         ],
       ),
       body: isWide
-          ? Row(
-          children: [
-            Expanded(flex: 5, child: formWidget),
-            if (_showPreview) Expanded(flex: 4, child: previewWidget.animate().fadeIn(duration: 300.ms).slideX(begin: 0.1, end: 0))
-          ])
+          ? Row(children: [
+        Expanded(flex: 5, child: formWidget),
+        if (_showPreview) Expanded(flex: 4, child: previewWidget.animate().fadeIn(duration: 300.ms).slideX(begin: 0.1, end: 0))
+      ])
           : DefaultTabController(
         length: 2,
         child: Column(
           children: [
-            const TabBar(tabs: [Tab(text: "Edit Prescription"), Tab(text: "Live Preview")], labelColor: Colors.blue),
+            const TabBar(
+                tabs: [Tab(text: "Edit Prescription"), Tab(text: "Live Preview")],
+                labelColor: Color(0xFF1E40AF),
+                indicatorColor: Color(0xFF1E40AF),
+                labelStyle: TextStyle(fontWeight: FontWeight.bold)
+            ),
             Expanded(child: TabBarView(children: [formWidget, previewWidget]))
           ],
         ),
@@ -407,37 +650,104 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     );
   }
 
+  // ULTRA MODERN MEDICINE ROW UI
   Widget _buildMedRow(int index, Map<String, String> med, bool isEmptyStomach) {
+    final Color mainColor = isEmptyStomach ? const Color(0xFFDC2626) : const Color(0xFF1E40AF);
+    final Color bgColor = isEmptyStomach ? const Color(0xFFFEF2F2) : const Color(0xFFEFF6FF);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: isEmptyStomach ? Colors.red.shade50 : Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-      child: ListTile(
-        leading: CircleAvatar(backgroundColor: Colors.white, child: Text('${index + 1}')),
-        title: Text(med['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('Sig: ${med['dose']} (${med['quantity']}) • ${med['timing']} • For ${med['duration']}'),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          onPressed: () {
-            setState(() {
-              if (isEmptyStomach) { emptyStomachMedicines.removeAt(index); } else { medicines.removeAt(index); }
-            });
-            _onDataChanged();
-          },
-        ),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32, height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+            child: Text('${index + 1}', style: TextStyle(color: mainColor, fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(med['name']!, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: [
+                    _buildMedTag(Icons.medication, '${med['doses']}'),
+                    _buildMedTag(Icons.schedule, '${med['frequency']}'),
+                    _buildMedTag(Icons.restaurant, '${med['timing']}'),
+                    _buildMedTag(Icons.calendar_today, '${med['duration']}'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+            tooltip: 'Remove',
+            onPressed: () {
+              setState(() { isEmptyStomach ? emptyStomachMedicines.removeAt(index) : medicines.removeAt(index); });
+              _onDataChanged();
+            },
+          )
+        ],
       ),
     );
   }
 
+  // TAG STYLING FOR MEDICINE DETAILS
+  Widget _buildMedTag(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          Text(text, style: const TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  // ULTRA MODERN CARD UI
   Widget _buildCard({required String title, required IconData icon, required Widget child}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))], border: Border.all(color: Colors.grey.shade100)),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: const Color(0xFF94A3B8).withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 8))],
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [Icon(icon, color: Theme.of(context).colorScheme.primary), const SizedBox(width: 8), Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800))]),
-          const SizedBox(height: 20),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: const Color(0xFF1E40AF), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.5))
+          ]),
+          const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Divider(color: Color(0xFFF1F5F9), height: 1, thickness: 2)
+          ),
           child,
         ],
       ),
