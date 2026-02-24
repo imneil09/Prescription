@@ -14,7 +14,7 @@ class DoctorPrescriptionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Dr. Rx Premium',
+      title: 'DOCTOR RX',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

@@ -105,14 +105,27 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
             ),
           ),
           // FOOTER
+          // FOOTER
           Positioned(
             bottom: 24,
             left: 0,
             right: 0,
             child: Center(
-              child: const Text(
-                "Designed & Developed @Rashi Lab – Proudly Made in India",
-                style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 0.5),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Designed & Developed by ",
+                    style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 0.5),
+                  ),
+                  // Make sure you have a logo image at this path
+                  Image.asset('assets/logo1.png', height: 20),
+                  const SizedBox(width: 4),
+                  const Text(
+                    "– Proudly Made in India",
+                    style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 0.5),
+                  ),
+                ],
               ).animate().fadeIn(delay: 800.ms),
             ),
           )
