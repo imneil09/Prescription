@@ -362,18 +362,17 @@ class PdfGenerator {
                                 crossAxisAlignment:
                                     pw.CrossAxisAlignment.center,
                                 children: [
-                                  pw.Text("Designed & Developed by",
+                                  pw.Text("Designed & Developed by ",
                                       style: const pw.TextStyle(
                                           fontSize: 8,
-                                          color: PdfColors.grey400)),
+                                          color: PdfColors.grey900)),
                                   pw.Image(logoImage,
                                       height:
                                           10), // Adjust the height as needed
-                                  pw.SizedBox(width: 4),
                                   pw.Text(".Proudly Made in India.",
                                       style: const pw.TextStyle(
                                           fontSize: 8,
-                                          color: PdfColors.grey400)),
+                                          color: PdfColors.grey900)),
                                 ]),
                             pw.SizedBox(height: 4),
                             pw.Text('For technical assistance: https://about.me/theneils',
