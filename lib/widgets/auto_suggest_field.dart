@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../utils/local_db.dart';
 
-class AutoSuggestField extends StatelessWidget {
+class AutoSuggestField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final String dbKey;
@@ -19,33 +19,53 @@ class AutoSuggestField extends StatelessWidget {
   });
 
   @override
+  State<AutoSuggestField> createState() => _AutoSuggestFieldState();
+}
+
+class _AutoSuggestFieldState extends State<AutoSuggestField> {
+  // 1. Preserve the FocusNode in the state
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(); // Initialize it exactly once
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose(); // Prevent memory leaks
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
         builder: (context, constraints) {
           return RawAutocomplete<String>(
-            textEditingController: controller,
-            focusNode: FocusNode(),
+            textEditingController: widget.controller,
+            focusNode: _focusNode, // 2. Use the preserved FocusNode
             optionsBuilder: (TextEditingValue textEditingValue) {
               if (textEditingValue.text.isEmpty) {
                 return const Iterable<String>.empty();
               }
-              return LocalDb.getSuggestions(dbKey).where((option) {
+              return LocalDb.getSuggestions(widget.dbKey).where((option) {
                 return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
               });
             },
             onSelected: (String selection) {
-              if (onChanged != null) onChanged!();
+              if (widget.onChanged != null) widget.onChanged!();
             },
             fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
               return TextField(
                 controller: textController,
                 focusNode: focusNode,
-                maxLines: maxLines,
+                maxLines: widget.maxLines,
                 onChanged: (_) {
-                  if (onChanged != null) onChanged!();
+                  if (widget.onChanged != null) widget.onChanged!();
                 },
                 decoration: InputDecoration(
-                  labelText: label,
+                  labelText: widget.label,
                   labelStyle: TextStyle(color: Colors.grey.shade600),
                 ),
                 onSubmitted: (String value) => onFieldSubmitted(),
