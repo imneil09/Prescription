@@ -105,7 +105,6 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
             ),
           ),
           // FOOTER
-          // FOOTER
           Positioned(
             bottom: 24,
             left: 0,

@@ -237,7 +237,6 @@ class PdfGenerator {
             rightWidgets.addAll(_buildKickAssMedList(data['medicines'], primaryDark, textMuted));
           }
 
-          // 3. Render them in Side-By-Side Partitions (Allows independent pagination!)
           return [
             pw.Partitions(
                 children: [
@@ -275,8 +274,6 @@ class PdfGenerator {
 
     return pdf.save();
   }
-
-  // --- KICK-ASS UI HELPER WIDGETS ---
 
   static pw.Widget _buildDataBlock(String label, String value, PdfColor valueColor, PdfColor labelColor) {
     return pw.Column(

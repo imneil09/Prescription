@@ -24,7 +24,6 @@ class DoctorPrescriptionApp extends StatelessWidget {
           surface: const Color(0xFFF8FAFC),
         ),
         useMaterial3: true,
-        // Removed google_fonts here to use standard offline system fonts
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
